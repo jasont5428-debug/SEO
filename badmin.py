@@ -1,95 +1,90 @@
 import streamlit as st
 import random
 
-st.set_page_config(page_title="선택 매칭기", layout="centered")
-
-# 급수별 점수 (A: 5점 ~ E: 1점)
+# 1. 페이지 설정
+st.set_page_config(page_title="배드민턴 전체 대진 시스템", layout="wide")
 LEVEL_WEIGHTS = {"A": 5, "B": 4, "C": 3, "D": 2, "E": 1}
 
-st.title("🏸 오늘 참석자 대진표")
+st.title("🏸 라운드별 전체 대진 일정표")
 
-# 1. 전체 회원 명단 관리 (세션 저장)
+# 2. 회원 데이터 관리 (최대 60명)
 if 'members' not in st.session_state:
-    # 기본 데이터 (테스트용)
-    st.session_state.members = [
-        {"이름": "강백호", "성별": "남", "급수": "A"},
-        {"이름": "서태웅", "성별": "남", "급수": "A"},
-        {"이름": "채치수", "성별": "남", "급수": "B"},
-        {"이름": "송태섭", "성별": "남", "급수": "C"},
-        {"이름": "정대만", "성별": "남", "급수": "B"},
-        {"이름": "안경선배", "성별": "남", "급수": "D"},
-        {"이름": "소연", "성별": "여", "급수": "E"},
-        {"이름": "한나", "성별": "여", "급수": "C"}
-    ]
-
-# 2. 새로운 회원 추가 (사이드바)
-with st.sidebar.expander("➕ 신규 회원 등록"):
-    new_n = st.text_input("이름")
-    new_g = st.selectbox("성별", ["남", "여"])
-    new_l = st.selectbox("급수", ["A", "B", "C", "D", "E"])
-    if st.button("회원 추가"):
-        if new_n:
-            st.session_state.members.append({"이름": new_n, "성별": new_g, "급수": new_l})
-            st.rerun()
-
-# 3. 중요!! 오늘 참석자 선택 (멀티셀렉트)
-st.subheader("✅ 오늘 운동 나온 사람 선택")
-member_names = [m["이름"] for m in st.session_state.members]
-selected_names = st.multiselect(
-    "이름을 검색하거나 선택하세요 (최소 4명)",
-    options=member_names,
-    default=[] # 처음엔 아무도 선택 안 된 상태
-)
-
-# 선택된 사람들의 상세 데이터만 추출
-present_players = [m for m in st.session_state.members if m["이름"] in selected_names]
-
-st.info(f"현재 선택된 인원: {len(present_players)}명")
-
-# 4. 매칭 버튼 및 로직
-if st.button("🎯 대진표 생성하기"):
-    if len(present_players) < 4:
-        st.error("최소 4명 이상 선택해야 경기를 잡을 수 있습니다!")
-    else:
-        # 급수 점수 부여 및 셔플
-        for p in present_players:
-            p['score'] = LEVEL_WEIGHTS.get(p['급수'], 1)
-        
-        random.shuffle(present_players)
-        # 실력순 정렬
-        sorted_players = sorted(present_players, key=lambda x: x['score'], reverse=True)
-        
-        st.divider()
-        st.subheader("🏟️ 코트 배정 결과")
-        
-        court_num = 1
-        # 4명씩 끊어서 매칭 (최대 4개 코트)
-        while len(sorted_players) >= 4 and court_num <= 4:
-            # 실력 균형을 위해 [1등, 4등] vs [2등, 3등] 조합
-            pool = [sorted_players.pop(0) for _ in range(4)]
-            pool.sort(key=lambda x: x['score'], reverse=True)
-            
-            team1 = [pool[0], pool[3]] # 최상 + 최하
-            team2 = [pool[1], pool[2]] # 중간 + 중간
-            
-            st.markdown(f"#### {court_num}번 코트")
-            c1, vs, c2 = st.columns([4, 1, 4])
-            with c1:
-                st.success(f"**팀 A**\n\n{team1[0]['이름']}({team1[0]['급수']}) / {team1[1]['이름']}({team1[1]['급수']})")
-            with vs:
-                st.write("\n\nVS")
-            with c2:
-                st.info(f"**팀 B**\n\n{team2[0]['이름']}({team2[0]['급수']}) / {team2[1]['이름']}({team2[1]['급수']})")
-            
-            court_num += 1
-            st.write("")
-
-        # 남은 인원 알림
-        if len(sorted_players) > 0:
-            rest_names = [p['이름'] for p in sorted_players]
-            st.warning(f"💡 대기 인원: {', '.join(rest_names)}")
-
-# 명단 삭제 기능
-if st.sidebar.button("🧹 전체 명단 초기화"):
     st.session_state.members = []
-    st.rerun()
+
+# 3. 사이드바: 회원 등록
+with st.sidebar:
+    st.header("👥 회원 관리")
+    with st.expander("➕ 신규 회원 등록"):
+        if len(st.session_state.members) >= 60:
+            st.warning("60명 정원 초과")
+        else:
+            n = st.text_input("이름")
+            g = st.selectbox("성별", ["남", "여"])
+            l = st.selectbox("급수", ["A", "B", "C", "D", "E"])
+            if st.button("등록"):
+                if n and not any(m['이름'] == n for m in st.session_state.members):
+                    st.session_state.members.append({"이름": n, "성별": g, "급수": l})
+                    st.rerun()
+    
+    if st.button("🧹 명단 초기화"):
+        st.session_state.members = []
+        st.rerun()
+
+# 4. 참석자 선택
+st.subheader("✅ 오늘 참석자 선택")
+member_options = [f"{m['이름']}({m['성별']}/{m['급수']})" for m in st.session_state.members]
+selected_list = st.multiselect("참석자를 체크하세요", options=member_options)
+
+current_players = []
+for opt in selected_list:
+    name = opt.split("(")[0]
+    p = next(m for m in st.session_state.members if m["이름"] == name)
+    current_players.append(p)
+
+st.info(f"현재 참여 인원: {len(current_players)}명")
+
+# 5. 경기 설정
+st.divider()
+col_c, col_r = st.columns(2)
+with col_c:
+    num_courts = st.select_slider("🏟️ 가동 코트 수", options=[1, 2, 3, 4], value=min(len(current_players)//4, 4) if len(current_players)>=4 else 1)
+with col_r:
+    num_rounds = st.number_input("🔄 생성할 라운드 수 (경기 수)", min_value=1, max_value=10, value=3)
+
+# 6. 전체 대진표 생성 및 나열
+if st.button("📅 전체 라운드 일정 생성하기"):
+    if len(current_players) < (num_courts * 4):
+        st.error(f"인원이 부족합니다! {num_courts}개 코트를 돌리려면 최소 {num_courts * 4}명이 필요합니다.")
+    else:
+        st.success(f"총 {num_rounds}라운드의 대진표를 생성했습니다. 아래로 스크롤하며 확인하세요!")
+        
+        # 라운드별로 반복 생성
+        for r in range(1, num_rounds + 1):
+            st.markdown(f"## 🏆 제 {r} 라운드 (Match {r})")
+            
+            # 매 라운드마다 새로운 랜덤 조합을 위해 셔플
+            random.seed(None)
+            temp_players = current_players.copy()
+            random.shuffle(temp_players)
+            # 실력 균형을 위해 급수순 정렬
+            sorted_players = sorted(temp_players, key=lambda x: LEVEL_WEIGHTS.get(x['급수'], 1), reverse=True)
+            
+            # 코트별 배치
+            court_cols = st.columns(num_courts)
+            for c in range(num_courts):
+                with court_cols[c]:
+                    pool = [sorted_players.pop(0) for _ in range(4)]
+                    t1 = [pool[0], pool[3]]
+                    t2 = [pool[1], pool[2]]
+                    
+                    st.markdown(f"**📍 {c+1}번 코트**")
+                    st.code(f"TEAM A: {t1[0]['이름']}, {t1[1]['이름']}\n   VS   \nTEAM B: {t2[0]['이름']}, {t2[1]['이름']}")
+            
+            # 대기자 표시
+            if sorted_players:
+                rest = [p['이름'] for p in sorted_players]
+                st.caption(f"💡 대기자: {', '.join(rest)}")
+            
+            st.divider() # 라운드 간 구분선
+
+        st.balloons()
